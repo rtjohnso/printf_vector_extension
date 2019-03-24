@@ -50,6 +50,16 @@ int main(int argc, char **argv)
   register_printf_specifier('V', printf_vector, printf_vector_arginfo_size);
   register_printf_specifier('W', printf_widget, printf_widget_arginfo_size);
 
+
+  /* Simple example */
+  printf("Warm-up example: { %3V }\n", S, "%s", ", ");
+  /*                         ^^^       ^   ^^    ^^                        
+                              |        |   |     |      
+  print a vector of 3 items --+        |   |     +-- delimiter to print between elements
+              pointer to the vector ---+   |    
+       format for printing one element ----+
+  */
+  
   /* The number of items in your vector is specified as the field
      width of the 'V' specifier, e.g. "%3V" specifies a vector of 3
      elements.  Use the '*' specifier if you need to specify a
@@ -120,17 +130,17 @@ int main(int argc, char **argv)
   /* Some simple examples. */
 
   /*     <Overall template>           [nelts]      [eltsize]           <vector>   <per-element template>                  <delimiter template>   [func]   [arg]   [extra args for element format] */
-  printf("S  = { %3V }\n",                                             S,         "%s",                                   ", "                                                              );
-  printf("LD = { %*V }\n",            3,                               LD,        "%Lf",                                  ", "                                                              );
-  printf("B  = { %3V }\n",                                             B,         "%hd",                                  ", "                                                              );
-  printf("A  = {\n%3V\n}\n",                                           A,         "  A[%18$d] = %d;",                     "\n"                                                              );
-  printf("WP = { %3V }\n",                                             WP,        "%W",                                   ", "                                                              );
-  printf("W  = { %#3.*V }\n",                      sizeof(W[0]),       W,         "%W",                                   ", "                                                              );
-  printf("F  = { %3hV }\n",                                            F,         "%f",                                   ", "                                                              );
-  printf("    Hex dump of F: %*V\n",  sizeof(F),                       F,         "%02hhx",                               ""                                                                );
-  printf("Another dump of F: %I*V\n", sizeof(F)/2,                     F,         "%04hx",                                " ",                   ntohs,   NULL                              );
-  printf("sqrt(F)  = { %I3hV }\n",                                     F,         "%f",                                   ", ",                  sqrtf,   NULL                              );
-  printf("Example: \n%I3hV\n",                                         F,         "  sqrt(F[%18$d]) = sqrt(%17$f) = %f",  "\n",                  sqrtf,   NULL                              );
-  printf("sqrt(AA) = { %# 3.*V }\n",               sizeof(AA[0]),      AA,        "{ %I3hV }",                            ", ",                                   "%.2f", ", ", sqrtf, NULL );
+  printf("S  = { %3V }\n",                                             S,         "%s",                                   ", "                                                                       );
+  printf("LD = { %*V }\n",            3,                               LD,        "%Lf",                                  ", "                                                                       );
+  printf("B  = { %3V }\n",                                             B,         "%hd",                                  ", "                                                                       );
+  printf("A  = {\n%3V\n}\n",                                           A,         "  A[%18$d] = %d;",                     "\n"                                                                       );
+  printf("WP = { %3V }\n",                                             WP,        "%W",                                   ", "                                                                       );
+  printf("W  = { %#3.*V }\n",                      sizeof(W[0]),       W,         "%W",                                   ", "                                                                       );
+  printf("F  = { %3hV }\n",                                            F,         "%f",                                   ", "                                                                       );
+  printf("    Hex dump of F: %*V\n",  sizeof(F),                       F,         "%02hhx",                               ""                                                                         );
+  printf("Another dump of F: %I*V\n", sizeof(F)/2,                     F,         "%04hx",                                " ",                   ntohs,   NULL                                       );
+  printf("sqrt(F)  = { %I3hV }\n",                                     F,         "%f",                                   ", ",                  sqrtf,   NULL                                       );
+  printf("Example: \n%I3hV\n",                                         F,         "  sqrt(F[%18$d]) = sqrt(%17$f) = %f",  "\n",                  sqrtf,   NULL                                       );
+  printf("sqrt(AA) = { %# 3.*V }\n",               sizeof(AA[0]),      AA,        "{ %I3hV }",                            ", ",                                   "%.2f", ", ", sqrtf, NULL          );
   return 0;
 }
