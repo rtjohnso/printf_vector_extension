@@ -47,15 +47,21 @@ static int pa2size(const struct printf_info *info, int pa)
   fprintf(stream, \
           fmt, \
           (fn) ? \
-             ((type (*)(type, void *, void *, int, int, int))(fn))(*(type *)(ptr), fnarg, array, i, width, prec) : \
+             ((type (*)(type, void *, void **, void *, int, int, int))(fn))(*(type *)(ptr), fnarg, extra_args, array, i, width, prec) : \
              *(type *)(ptr), \
+          extra_args[0],  extra_args[1],  extra_args[2],  extra_args[3], \
+          extra_args[4],  extra_args[5],  extra_args[6],  extra_args[7], \
+          extra_args[8],  extra_args[9],  extra_args[10], extra_args[11], \
+          extra_args[12], extra_args[13], extra_args[14], \
           *(type *)(ptr), \
           i, \
           array, \
           width, \
-          prec)
+          prec, \
+          fnarg)
 
 static int print_vector_elt(FILE *stream, char *fmt, const struct printf_info *info, int pa,
+                            void *extra_args[15],
                             void *array, void *eltp, int i, int width, int prec, void *fn, void *fnarg)
 {
   if (pa & PA_FLAG_PTR) {
@@ -100,6 +106,59 @@ static int print_vector_elt(FILE *stream, char *fmt, const struct printf_info *i
   return -1;
 }
 
+#define MAX_EXTRA_ARGS (15)
+
+static int nextra_args(const struct printf_info *info)
+{
+  int args = 0;
+  if (info->left)
+    args += 8;
+  if (info->space)
+    args += 4;
+  if (info->showsign)
+    args += 2;
+  if (info->group)
+    args += 1;
+  return args;
+}
+
+/* Returns an string explaining the error if there is one, or NULL if it is valid. */
+static const char * is_valid_argtype_array(int elt_must_be_pointer, int nextras, int nargs, int argtypes[22])
+{
+  /* 
+     A valid array is of the form
+     { elt_type, PA_POINTER, ..., PA_POINTER, elt_type, PA_INT, PA_POINTER, PA_INT, PA_INT, PA_POINTER };
+                 |-----MAX_EXTRA_ARGS------|
+  */
+  /* static const int extra_args_array[MAX_EXTRA_ARGS] = { PA_POINTER, PA_POINTER, PA_POINTER, PA_POINTER, */
+  /*                                                       PA_POINTER, PA_POINTER, PA_POINTER, PA_POINTER, */
+  /*                                                       PA_POINTER, PA_POINTER, PA_POINTER, PA_POINTER, */
+  /*                                                       PA_POINTER, PA_POINTER, PA_POINTER, PA_POINTER, }; */
+  
+  if (nargs < 0)
+    return "Per-element format takes a negative number of arguments?!?";
+  if (nargs > 22)
+    return "Per-element format requires more than the maximum supported number of arguments (22)";
+  if (elt_must_be_pointer && argtypes[0] != PA_POINTER)
+    return "Per-element format does not expect element to be a pointer, but you specified the '#' option to the 'V' format specififer";
+  //if (memcmp(&argtypes[1], extra_args_array, nextras * sizeof(argtypes[0])))
+  //  return "Per-element format does not expect all extra args to be pointers";
+  if (nargs > MAX_EXTRA_ARGS + 1 && argtypes[MAX_EXTRA_ARGS + 1] != argtypes[0])
+    return "The 17th argument must be the same type as the first argument.";
+  if (nargs > MAX_EXTRA_ARGS + 2 && (argtypes[MAX_EXTRA_ARGS + 2] & ~PA_FLAG_MASK) != PA_INT)
+    return "The 18th argument must be of type int (the index of the current element in the array).";
+  if (nargs > MAX_EXTRA_ARGS + 3 && argtypes[MAX_EXTRA_ARGS + 3] != PA_POINTER)
+    return "The 19th argument must be a pointer type (the array).";
+  if (nargs > MAX_EXTRA_ARGS + 4 && (argtypes[MAX_EXTRA_ARGS + 4] & ~PA_FLAG_MASK) != PA_INT)
+    return "The 20th argument must be an int (the number of items in the array).";
+  if (nargs > MAX_EXTRA_ARGS + 5 && (argtypes[MAX_EXTRA_ARGS + 5] & ~PA_FLAG_MASK) != PA_INT)
+    return "The 21st argument must be an int (the precision arg of the 'V' specifier).";
+  if (nargs > MAX_EXTRA_ARGS + 6 && argtypes[MAX_EXTRA_ARGS + 5] != PA_POINTER)
+    return "The 22nd argument must be a pointer type (the fnarg optional argument or NULL).";
+
+  return NULL;
+}
+
 int printf_vector(FILE *stream, 
                   const struct printf_info *info,
                   const void * const *args)
@@ -107,7 +166,10 @@ int printf_vector(FILE *stream,
   int i;
   int nchars = 0;
   int nargs;
-  int argtype[6] = { 0, 0, PA_INT, PA_POINTER, PA_INT, PA_INT };
+  int argtype[MAX_EXTRA_ARGS + 7];
+  void *extra_args[MAX_EXTRA_ARGS] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                                       NULL, NULL, NULL, NULL, NULL, NULL, NULL, };
+  int nextras = 0;
   int eltsz;
 
   int nelts;
@@ -116,38 +178,46 @@ int printf_vector(FILE *stream,
   void *array;
   void *fn = NULL;
   void *fnarg = NULL;
+  int next_arg = 0;
+  const char *error_string;
   
   nelts = info->width;
-  array = *(void **)args[0];
-  eltfmt = *(char **)args[1];
-  delim = *(char **)args[2];
-  if (info->showsign) {
-    fn = *(void **)args[3];
+  nextras = nextra_args(info);
+
+  /* Get our args, including optional extra args to be passed through to the per-element format */
+  array =   *(void **)args[0];
+  eltfmt =  *(char **)args[1];
+  delim =   *(char **)args[2];
+  if (!info->i18n) {
+    next_arg =             3;
+  } else {
+    fn =    *(void **)args[3];
     fnarg = *(void **)args[4];
+    next_arg =             5;
+  }
+  for (i = 0; i < nextras; i++)
+    extra_args[i] = *(void **)args[next_arg++];
+
+  /* Now parse the per-element format and check that it is consistent with the options we were given */
+  nargs = parse_printf_format(eltfmt, MAX_EXTRA_ARGS + 7, argtype);
+  error_string = is_valid_argtype_array(info->alt, nextras, nargs, argtype);
+  if (error_string) {
+    return fprintf(stream, "ERRROR: printf_vector: %s", error_string);
   }
   
-  nargs = parse_printf_format(eltfmt, 4, argtype);
-  if (nargs < 0 || nargs > 6 ||
-      (nargs > 1 && argtype[0] != argtype[1]) || 
-      argtype[2] != PA_INT ||
-      argtype[3] != PA_POINTER ||
-      argtype[4] != PA_INT ||
-      argtype[5] != PA_INT)
-    return -1;
+  /* Compute element size (and possibly override it) from per-element format */
   eltsz = pa2size(info, argtype[0]);
   if (info->prec > 0)
     eltsz = info->prec;
-  if (info->alt && argtype[0] != PA_POINTER)
-    return -1;
 
   void * eltp = array;
   for (i = 0; i < nelts - 1; i++) {
-    nchars += print_vector_elt(stream, eltfmt, info, argtype[0], array, eltp, i, info->width, info->prec, fn, fnarg);
-    nchars += fprintf(stream, delim, i, array, info->width, info->prec);
+    nchars += print_vector_elt(stream, eltfmt, info, argtype[0], extra_args, array, eltp, i, info->width, info->prec, fn, fnarg);
+    nchars += print_vector_elt(stream, delim, info, argtype[0], extra_args, array, eltp, i, info->width, info->prec, fn, fnarg);
     eltp += eltsz;
   }
   if (nelts > 0)
-    nchars += print_vector_elt(stream, eltfmt, info, argtype[0], array, eltp, i, info->width, info->prec, fn, fnarg);
+    nchars += print_vector_elt(stream, eltfmt, info, argtype[0], extra_args, array, eltp, i, info->width, info->prec, fn, fnarg);
 
   return nchars;
 }
@@ -157,11 +227,20 @@ int printf_vector_arginfo_size (const struct printf_info *info,
                                 int *argtypes,
                                 int *size)
 {
-  static const int myargtypes[5] = { PA_POINTER, PA_STRING, PA_STRING, PA_POINTER, PA_POINTER };
-  memcpy(argtypes, myargtypes, (5 < n ? 5 : n)  * sizeof(argtypes));
-  if (info->showsign)
-    return 5;
-  else 
-    return 3;
+  static const int myargtypes[20] = { PA_POINTER, PA_STRING, PA_STRING, // Required
+                                      PA_POINTER, PA_POINTER, // 'I' fn and arg
+                                      // Optional additional args to per-element and delimiter formats
+                                      PA_POINTER, PA_POINTER, PA_POINTER, PA_POINTER,
+                                      PA_POINTER, PA_POINTER, PA_POINTER, PA_POINTER,
+                                      PA_POINTER, PA_POINTER, PA_POINTER, PA_POINTER,
+                                      PA_POINTER, PA_POINTER, PA_POINTER, 
+  };
+  int args = 3;
+  if (info->i18n)
+    args += 2;
+  args += nextra_args(info);
+  
+  memcpy(argtypes, myargtypes, (20 < n ? 20 : n)  * sizeof(argtypes[0]));
+  return args;
 }
 
