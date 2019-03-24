@@ -50,10 +50,10 @@ int main(int argc, char **argv)
   register_printf_specifier('V', printf_vector, printf_vector_arginfo_size);
   register_printf_specifier('W', printf_widget, printf_widget_arginfo_size);
 
-  /* The number of items in your vector is specified as the width option to
-     the 'V' specifier, e.g. "%3V" specifies a vector of 3 elements.
-     Use the '*' specifier if you need to specify a run-time computed
-     length. */
+  /* The number of items in your vector is specified as the field
+     width of the 'V' specifier, e.g. "%3V" specifies a vector of 3
+     elements.  Use the '*' specifier if you need to specify a
+     run-time computed length. */
   
   /* The printf_vector code attempts to infer the size and type of
      elements of your array from the per-element format string, so you
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
      specify 'h' as a modifier to the 'V' specifier (an extension
      specific to the printf_vector code). */
 
-  /* The '-', ' ', '+', and ''' format-specifier options are used to
+  /* The '-', ' ', '+', and ''' format flags are used to
      indicate the number of extra arguments that should be passed
      through to the per-element and delimiter formats.  The encoding
      is the sum of the values indicated below:
@@ -82,12 +82,13 @@ int main(int argc, char **argv)
                extra_arg[0], ..., extra_arg[14],
                elt, index, array, width, precision, fnarg_or_null)
                ^^^  ^^^^^  ^^^^^  ^^^^^  ^^^^^^^^^  ^^^^^^^^^^^^^
-               17   18     19     20     21         22
+               17   18     19     20     21         22   <-- positional indices 
+                                                              of these args
      where 
      - fn and fnarg are the conversion function (see comment on 'I' 
        below) or the identity function if 'I' is not used, 
-     - extra_args is an array of all given extra args padded with NULL,
      - elt is the current element being printed, 
+     - extra_args is an array of all given extra args padded with NULL,
      - index is the index of the element in the array, 
      - array is the vector being printed, 
      - width and precision are the width and precision values
@@ -97,30 +98,28 @@ int main(int argc, char **argv)
        per-element format and once for the delimiter) so you probably
        don't want it to have any side effects. */
 
-  /* If you specify the '#' modifier to the 'V' specifier, then a
+  /* If you specify the '#' flag to the 'V' specifier, then a
      pointer to the ith element, rather than the ith element itself,
      will be passed to the per-element template. If you also specify a
-     conversion function using the 'I' option, then the function is
+     conversion function using the 'I' flag, then the function is
      applied to the pointer. */
 
   /* If you specify a precision w for the 'V' conversion, then it will
      treat each element of the vector as being of size w bytes. This
-     can be combined with the '#' modifier to pass a pointer to each
+     can be combined with the '#' flag to pass a pointer to each
      element of an array of structs, and using a custom specifier to
-     print out each struct, as in the widget example below.  */
+     print out each struct, as in the widget and multi-dimensional
+     array examples below.  */
 
-  /* If you specify the 'I' modifier, then you can pass a function
+  /* If you specify the 'I' flag, then you can pass a function
      (and auxiliary argument) that will be applied to each element of
-     the vector before printing it. The function will be called as
-     fn(elt, arg, indx, array, width, prec), where indx is the indx of
-     the current element, array is the vector being printed, width and
-     prec are the width and precision options to the 'V' specifier.
-     This can be used to do, say, endianness conversion. The original
-     value is the second argument to the per-element format. */
+     the vector before printing it. This can be used to do, say,
+     endianness conversion. These parameters come before any extra
+     parameters. */
   
   /* Some simple examples. */
 
-  /*     <Overall template>           [nelts]      [eltsize]           <vector>   <per-element template>                  <delimiter template>   [func]   [arg]   [extra args] */
+  /*     <Overall template>           [nelts]      [eltsize]           <vector>   <per-element template>                  <delimiter template>   [func]   [arg]   [extra args for element format] */
   printf("S  = { %3V }\n",                                             S,         "%s",                                   ", "                                                              );
   printf("LD = { %*V }\n",            3,                               LD,        "%Lf",                                  ", "                                                              );
   printf("B  = { %3V }\n",                                             B,         "%hd",                                  ", "                                                              );
