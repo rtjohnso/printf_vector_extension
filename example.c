@@ -78,11 +78,11 @@ int main(int argc, char **argv)
   /* If you specify the '+' modifier, then you can pass a function
      (and auxiliary argument) that will be applied to each element of
      the vector before printing it. The function will be called as
-     fn(elt, arg, indx, width, prec), where indx is the indx of the
-     current element, width and prec are the width and precision
-     options to the 'V' specifier.  This can be used to do, say,
-     endianness conversion. The original value is the second argument
-     to the per-element format. */
+     fn(elt, arg, indx, array, width, prec), where indx is the indx of
+     the current element, array is the vector being printed, width and
+     prec are the width and precision options to the 'V' specifier.
+     This can be used to do, say, endianness conversion. The original
+     value is the second argument to the per-element format. */
   
   /* Some simple examples. */
 

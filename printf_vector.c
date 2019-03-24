@@ -43,45 +43,55 @@ static int pa2size(const struct printf_info *info, int pa)
   return -1;
 }
 
-#define APPLY_TYPE(type, fn, farg, ptr) (fn) ? ((type (*)(type, void *, void *, int, int, int))(fn))(*(type *)(ptr), (farg), array, i, width, prec) : *(type *)(ptr), *(type *)(ptr)
+#define FPRINTF_AS_TYPE(type, ptr) \
+  fprintf(stream, \
+          fmt, \
+          (fn) ? \
+             ((type (*)(type, void *, void *, int, int, int))(fn))(*(type *)(ptr), fnarg, array, i, width, prec) : \
+             *(type *)(ptr), \
+          *(type *)(ptr), \
+          i, \
+          array, \
+          width, \
+          prec)
 
 static int print_vector_elt(FILE *stream, char *fmt, const struct printf_info *info, int pa,
                             void *array, void *eltp, int i, int width, int prec, void *fn, void *fnarg)
 {
   if (pa & PA_FLAG_PTR) {
     if (info->alt)
-      return fprintf(stream, fmt, APPLY_TYPE(void *, fn, fnarg, &eltp), i, width, prec);
+      return FPRINTF_AS_TYPE(void *, &eltp);
     else 
-      return fprintf(stream, fmt, APPLY_TYPE(void *, fn, fnarg, eltp),  i, width, prec);
+      return FPRINTF_AS_TYPE(void *, eltp);
   }
   
   switch (pa & (~PA_FLAG_MASK)) {
   case PA_INT:
     switch (pa & PA_FLAG_MASK) {
-    case 0:                 return fprintf(stream, fmt, APPLY_TYPE(int,       fn, fnarg, eltp), i, width, prec);
-    case PA_FLAG_LONG_LONG: return fprintf(stream, fmt, APPLY_TYPE(long long, fn, fnarg, eltp), i, width, prec);
-    case PA_FLAG_LONG:      return fprintf(stream, fmt, APPLY_TYPE(long,      fn, fnarg, eltp), i, width, prec);
-    case PA_FLAG_SHORT:     return fprintf(stream, fmt, APPLY_TYPE(short,     fn, fnarg, eltp), i, width, prec);
+    case 0:                 return FPRINTF_AS_TYPE(int,       eltp);
+    case PA_FLAG_LONG_LONG: return FPRINTF_AS_TYPE(long long, eltp);
+    case PA_FLAG_LONG:      return FPRINTF_AS_TYPE(long,      eltp);
+    case PA_FLAG_SHORT:     return FPRINTF_AS_TYPE(short,     eltp);
     default: return -1;
     }
-  case PA_CHAR:    return fprintf(stream, fmt, APPLY_TYPE(char,      fn, fnarg, eltp), i, width, prec);
-  case PA_WCHAR:   return fprintf(stream, fmt, APPLY_TYPE(wchar_t,   fn, fnarg, eltp), i, width, prec);
+  case PA_CHAR:    return FPRINTF_AS_TYPE(char,      eltp);
+  case PA_WCHAR:   return FPRINTF_AS_TYPE(wchar_t,   eltp);
 
-  case PA_STRING:  return fprintf(stream, fmt, APPLY_TYPE(char *,    fn, fnarg, eltp), i, width, prec);
-  case PA_WSTRING: return fprintf(stream, fmt, APPLY_TYPE(wchar_t *, fn, fnarg, eltp), i, width, prec);
+  case PA_STRING:  return FPRINTF_AS_TYPE(char *,    eltp);
+  case PA_WSTRING: return FPRINTF_AS_TYPE(wchar_t *, eltp);
   case PA_POINTER:
     if (info->alt)
-      return fprintf(stream, fmt, APPLY_TYPE(void *, fn, fnarg, &eltp), i, width, prec);
+      return FPRINTF_AS_TYPE(void *, &eltp);
     else 
-      return fprintf(stream, fmt, APPLY_TYPE(void *, fn, fnarg, eltp),  i, width, prec);
+      return FPRINTF_AS_TYPE(void *, eltp);
 
-  case PA_FLOAT:   return fprintf(stream, fmt, APPLY_TYPE(float, fn, fnarg, eltp), i, width, prec);
+  case PA_FLOAT:   return FPRINTF_AS_TYPE(float, eltp);
   case PA_DOUBLE:
     switch (pa & PA_FLAG_MASK) {
     case 0:                   return info->is_short ? 
-                                     fprintf(stream, fmt, APPLY_TYPE(float,       fn, fnarg, eltp), i, width, prec) :
-                                     fprintf(stream, fmt, APPLY_TYPE(double,      fn, fnarg, eltp), i, width, prec);
-    case PA_FLAG_LONG_DOUBLE: return fprintf(stream, fmt, APPLY_TYPE(long double, fn, fnarg, eltp), i, width, prec);
+                                     FPRINTF_AS_TYPE(float,       eltp) :
+                                     FPRINTF_AS_TYPE(double,      eltp);
+    case PA_FLAG_LONG_DOUBLE: return FPRINTF_AS_TYPE(long double, eltp);
     default: return -1;
     }
   default: return -1;
@@ -97,7 +107,7 @@ int printf_vector(FILE *stream,
   int i;
   int nchars = 0;
   int nargs;
-  int argtype[5] = { 0, 0, PA_INT, PA_INT, PA_INT };
+  int argtype[6] = { 0, 0, PA_INT, PA_POINTER, PA_INT, PA_INT };
   int eltsz;
 
   int nelts;
@@ -117,9 +127,12 @@ int printf_vector(FILE *stream,
   }
   
   nargs = parse_printf_format(eltfmt, 4, argtype);
-  if (nargs < 0 || nargs > 5 || (nargs > 1 && argtype[0] != argtype[1]) || 
-      argtype[2] != PA_INT || argtype[3] != PA_INT ||
-      argtype[4] != PA_INT)
+  if (nargs < 0 || nargs > 6 ||
+      (nargs > 1 && argtype[0] != argtype[1]) || 
+      argtype[2] != PA_INT ||
+      argtype[3] != PA_POINTER ||
+      argtype[4] != PA_INT ||
+      argtype[5] != PA_INT)
     return -1;
   eltsz = pa2size(info, argtype[0]);
   if (info->prec > 0)
