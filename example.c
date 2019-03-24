@@ -132,6 +132,6 @@ int main(int argc, char **argv)
   printf("Another dump of F: %I*V\n", sizeof(F)/2,                     F,         "%04hx",                                " ",                   ntohs,   NULL                              );
   printf("sqrt(F)  = { %I3hV }\n",                                     F,         "%f",                                   ", ",                  sqrtf,   NULL                              );
   printf("Example: \n%I3hV\n",                                         F,         "  sqrt(F[%18$d]) = sqrt(%17$f) = %f",  "\n",                  sqrtf,   NULL                              );
-  printf("AA = { %# 3.*V }\n",                     sizeof(AA[0]),      AA,        "{ %I3hV }",                            ", ",                                   "%.2f", ", ", sqrtf, NULL );
+  printf("sqrt(AA) = { %# 3.*V }\n",               sizeof(AA[0]),      AA,        "{ %I3hV }",                            ", ",                                   "%.2f", ", ", sqrtf, NULL );
   return 0;
 }
